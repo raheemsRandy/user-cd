@@ -1,0 +1,47 @@
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user
+  namespace: roboshop
+  #deploy set labels
+  labels:
+    component: user
+    project: roboshop
+    tier: database 
+    
+spec:
+  replicas: 1
+  #these are the labels replicaset uses to create pod replicas this should mach pod labels
+  selector:
+    matchLabels:
+      component: user
+      project: roboshop
+      tier: app 
+
+  #pod definition
+  template:
+      metadata:
+        labels:
+          component: user
+          project: roboshop
+          tier: app 
+      spec:
+        containers:
+        - name: user
+          image: "{{ .Values.deployment.imageURL }}:{{ .Values.deployment.imageVersion }}"
+          command: ["sh", "-c","echo 'failure' && exit 1" ]
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "120Mi"
+            limits:
+              cpu: "100m"
+              memory: "256Mi"
+
+
+---
+
+
