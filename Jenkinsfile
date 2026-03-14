@@ -18,7 +18,9 @@ pipeline {
         choice(name: 'deploy_to', choices: ['dev', 'qa', 'prod'], description: 'Pick the Environment')
     }
     // Build
-     stage('Deploy') {
+    
+    stages {
+         stage('Deploy') {
             steps {
                 script {
                     withAWS(credentials: 'aws-creds', region: 'us-east-1') {
@@ -33,7 +35,6 @@ pipeline {
                 }
             }
         }
-    stages {
         stage('Check Status'){
             steps{
                 script{
