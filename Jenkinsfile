@@ -1,66 +1,50 @@
 pipeline {
-
-    agent {
-        label 'Agent1'
+    agent  {
+        label 'AGENT-1'
     }
-
-    environment {
+    environment { 
         appVersion = ''
-        REGION = 'us-east-1'
-        ACC_ID ='989088456804'
-        PROJECT = 'roboshop'
-        COMPONENT = 'user'
+        REGION = "us-east-1"
+        ACC_ID = "315069654700"
+        PROJECT = "roboshop"
+        COMPONENT = "user"
     }
-
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 30, unit: 'MINUTES') 
         disableConcurrentBuilds()
     }
     parameters {
-        string ( name: 'appVersion', description: 'image version of the application')
-        choice (name: 'deploy_to', choices:['dev', 'qa', 'prod'], description: 'Pick the Environment')
+        string(name: 'appVersion', description: 'Image version of the application')
+        choice(name: 'deploy_to', choices: ['dev', 'qa', 'prod'], description: 'Pick the Environment')
     }
+    // Build
     stages {
-         stage('Check Status') {
-            steps {
-                script {
-                    withAWS(credentials: 'aws-creds', region: "${REGION}") {
-                        sh """
-                            aws eks update-kubeconfig --region ${REGION} --name "${PROJECT}-${params.deploy_to}"
-                        """
-
-                        def deploymentStatus = sh(
-                            returnStdout: true,
-                            script: """
-                                kubectl rollout status deployment/${env.COMPONENT} --timeout=60s -n ${PROJECT} || echo FAILED
-                            """
-                        ).trim()
-
+        stage('Check Status'){
+            steps{
+                script{
+                    withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                        def deploymentStatus = sh(returnStdout: true, script: "kubectl rollout status deployment/user --timeout=30s -n $PROJECT || echo FAILED").trim()
                         if (deploymentStatus.contains("successfully rolled out")) {
-                            echo "✅ Deployment successful!"
+                            echo "Deployment is success"
                         } else {
-                            echo "⚠️ Deployment failed. Checking if rollback is possible..."
-                            // Check if a previous Helm revision exists
-                            def revision = sh(returnStdout: true, script: "helm history ${COMPONENT} -n ${PROJECT} | tail -n +2 | wc -l").trim().toInteger()
-
-                            if (revision > 1) {
-                                echo "🔁 Rolling back to previous revision..."
-                                sh """
-                                    helm rollback ${COMPONENT} -n ${PROJECT}
-                                    sleep 20
-                                    kubectl rollout status deployment/${COMPONENT} --timeout=60s -n ${PROJECT} || echo FAILED
-                                """
-                                echo "deployment failed but rollback success"
-                            } else {
-                                echo "🚫 No previous Helm release found — skipping rollback."
-                                error "Deployment failed (no rollback possible)."
+                            sh """
+                                helm rollback $COMPONENT -n $PROJECT
+                                sleep 20
+                            """
+                            def rollbackStatus = sh(returnStdout: true, script: "kubectl rollout status deployment/user --timeout=30s -n $PROJECT || echo FAILED").trim()
+                            if (rollbackStatus.contains("successfully rolled out")) {
+                                error "Deployment is Failure, Rollback Success"
+                            }
+                            else{
+                                error "Deployment is Failure, Rollback Failure. Application is not running"
                             }
                         }
+
                     }
                 }
             }
         }
-        stage('deploy') {
+        stage('Deploy') {
             steps {
                 script {
                     withAWS(credentials: 'aws-creds', region: 'us-east-1') {
@@ -75,64 +59,59 @@ pipeline {
                 }
             }
         }
-       
 
-    //Api testing
-    stage('functional testing') {
-        when {
-            expression { params.deploy_to == "dev"}
-         }
-            steps {
-                script {
-                   echo "Functional testing started" 
-                 }    
+        
+        // API Testing
+        stage('Functional Testing'){
+            when{
+                expression { params.deploy_to = "dev" }
             }
-       
-    }
-     //All components testing
-    stage('integration testing') {
-        when {
-            expression { params.deploy_to == "qa"}
-         }
-            steps {
-                script {
-                    echo "integration testing started"  
-                 }    
+             steps{
+                script{
+                    echo "Run functional test cases"
+                }
             }
-       
-    }
-     stage('prod-deploy') {
-         when {
-            expression { params.deploy_to == "prod"}
-         }  
+        }
+        // All components testing
+        stage('Integration Testing'){
+            when{
+                expression { params.deploy_to = "qa" }
+            }
+             steps{
+                script{
+                    echo "Run Integration test cases"
+                }
+            }
+        }
+        stage('PROD Deploy') {
+            when{
+                expression { params.deploy_to = "prod" }
+            }
             steps {
                 script {
                     withAWS(credentials: 'aws-creds', region: 'us-east-1') {
                         sh """
                             echo "get cr number"
-                            echo "check with in the deployment_window"
+                            echo "check with in the deployment window"
                             echo "is CR approved"
                             echo "trigger PROD deploy"
                         """
                     }
                 }
             }
-       
+        }
     }
-}
 
-    post {
-        always {
-            echo 'Cleaning workspace'
+    post { 
+        always { 
+            echo 'I will always say Hello again!'
             deleteDir()
         }
-
-        success {
-            echo 'Pipeline Success'
+        success { 
+            echo 'Hello Success'
         }
-
-        failure {
-            echo 'Pipeline Failed'
+        failure { 
+            echo 'Hello Failure'
         }
     }
 }
